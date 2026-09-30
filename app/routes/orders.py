@@ -153,3 +153,48 @@ def update_order_status(
     db.refresh(order)
 
     return order
+
+
+@router.put("/{order_id}/cancel", response_model=OrderResponse)
+def cancel_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    order = db.query(Order).filter(
+        Order.id == order_id,
+        Order.user_id == current_user.id
+    ).first()
+
+    if not order:
+        raise HTTPException(
+            status_code=404,
+            detail="Order not found"
+        )
+
+    if order.status == "Cancelled":
+        raise HTTPException(
+            status_code=400,
+            detail="Order is already cancelled"
+        )
+
+    if order.status in ["Shipped", "Delivered"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Order cannot be cancelled at this stage"
+        )
+
+    for order_item in order.items:
+        product = db.query(Product).filter(
+            Product.id == order_item.product_id
+        ).first()
+
+        if product:
+            product.stock += order_item.quantity
+
+    order.status = "Cancelled"
+
+    db.commit()
+    db.refresh(order)
+
+    return order

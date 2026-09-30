@@ -22,6 +22,7 @@ def create_product(
     new_product = Product(
         name=product.name,
         description=product.description,
+        category=product.category,
         price=product.price,
         stock=product.stock
     )
@@ -36,6 +37,7 @@ def create_product(
 @router.get("/", response_model=list[ProductResponse])
 def get_products(
     search: str | None = Query(None),
+    category: str | None = Query(None),
     min_price: float | None = Query(None, ge=0),
     max_price: float | None = Query(None, ge=0),
     db: Session = Depends(get_db)
@@ -55,6 +57,11 @@ def get_products(
         query = query.filter(
             Product.name.ilike(f"%{search}%")
         )
+
+    if category:
+        query = query.filter(
+            Product.category.ilike(category)
+       )
 
     if min_price is not None:
         query = query.filter(
@@ -102,6 +109,7 @@ def update_product(
 
     product.name = product_data.name
     product.description = product_data.description
+    product.category = product_data.category
     product.price = product_data.price
     product.stock = product_data.stock
 

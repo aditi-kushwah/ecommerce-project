@@ -9,5 +9,6 @@ class Product(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
+    category = Column(String, nullable=False)
     price = Column(Float, nullable=False)
     stock = Column(Integer, default=0)

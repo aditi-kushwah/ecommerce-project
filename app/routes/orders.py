@@ -6,8 +6,8 @@ from app.models.cart import Cart
 from app.models.order import Order, OrderItem
 from app.models.product import Product
 from app.models.user import User
-from app.schemas.order import OrderResponse
-from app.utils.dependencies import get_current_user
+from app.schemas.order import OrderResponse, OrderStatusUpdate
+from app.utils.dependencies import get_current_user, get_current_admin
 
 
 router = APIRouter(
@@ -114,5 +114,42 @@ def get_order(
             status_code=404,
             detail="Order not found"
         )
+
+    return order
+
+@router.put("/{order_id}/status", response_model=OrderResponse)
+def update_order_status(
+    order_id: int,
+    status_data: OrderStatusUpdate,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin)
+):
+    order = db.query(Order).filter(
+        Order.id == order_id
+    ).first()
+
+    if not order:
+        raise HTTPException(
+            status_code=404,
+            detail="Order not found"
+        )
+
+    allowed_statuses = [
+        "Pending",
+        "Confirmed",
+        "Shipped",
+        "Delivered"
+    ]
+
+    if status_data.status not in allowed_statuses:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid order status"
+        )
+
+    order.status = status_data.status
+
+    db.commit()
+    db.refresh(order)
 
     return order

@@ -40,6 +40,9 @@ def get_products(
     category: str | None = Query(None),
     min_price: float | None = Query(None, ge=0),
     max_price: float | None = Query(None, ge=0),
+    sort: str | None = Query(None),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
     query = db.query(Product)
@@ -51,8 +54,6 @@ def get_products(
                 detail="min_price cannot be greater than max_price"
             )
 
-
-
     if search:
         query = query.filter(
             Product.name.ilike(f"%{search}%")
@@ -61,7 +62,7 @@ def get_products(
     if category:
         query = query.filter(
             Product.category.ilike(category)
-       )
+        )
 
     if min_price is not None:
         query = query.filter(
@@ -73,67 +74,24 @@ def get_products(
             Product.price <= max_price
         )
 
-    return query.all()
+    if sort == "price_asc":
+        query = query.order_by(Product.price.asc())
 
+    elif sort == "price_desc":
+        query = query.order_by(Product.price.desc())
 
-@router.get("/{product_id}", response_model=ProductResponse)
-def get_product(
-    product_id: int,
-    db: Session = Depends(get_db)
-):
-    product = db.query(Product).filter(Product.id == product_id).first()
+    elif sort == "name_asc":
+        query = query.order_by(Product.name.asc())
 
-    if not product:
+    elif sort == "name_desc":
+        query = query.order_by(Product.name.desc())
+
+    elif sort is not None:
         raise HTTPException(
-            status_code=404,
-            detail="Product not found"
+            status_code=400,
+            detail="Invalid sort option"
         )
 
-    return product
+    skip = (page - 1) * limit
 
-
-@router.put("/{product_id}", response_model=ProductResponse)
-def update_product(
-    product_id: int,
-    product_data: ProductCreate,
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_admin)
-):
-    product = db.query(Product).filter(Product.id == product_id).first()
-
-    if not product:
-        raise HTTPException(
-            status_code=404,
-            detail="Product not found"
-        )
-
-    product.name = product_data.name
-    product.description = product_data.description
-    product.category = product_data.category
-    product.price = product_data.price
-    product.stock = product_data.stock
-
-    db.commit()
-    db.refresh(product)
-
-    return product
-
-
-@router.delete("/{product_id}")
-def delete_product(
-    product_id: int,
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_admin)
-):
-    product = db.query(Product).filter(Product.id == product_id).first()
-
-    if not product:
-        raise HTTPException(
-            status_code=404,
-            detail="Product not found"
-        )
-
-    db.delete(product)
-    db.commit()
-
-    return {"message": "Product deleted successfully"}
+    return query.offset(skip).limit(limit).all()
